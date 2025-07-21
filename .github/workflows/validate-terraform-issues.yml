@@ -69,28 +69,8 @@ jobs:
         run: terraform validate -no-color
         continue-on-error: true
 
-      - name: Set validation outputs
-        if: steps.extract-terraform.outputs.has_terraform == 'true'
-        id: terraform
-        run: |
-          if [[ "${{ steps.init.outputs.exitcode }}" != "0" ]]; then
-            echo "valid=false" >> $GITHUB_OUTPUT
-            echo "failed=init" >> $GITHUB_OUTPUT
-            echo "error<<EOF" >> $GITHUB_OUTPUT
-            echo "${{ steps.init.outputs.stderr }}"
-            echo "EOF" >> $GITHUB_OUTPUT
-          elif [[ "${{ steps.validate.outputs.exitcode }}" != "0" ]]; then
-            echo "valid=false" >> $GITHUB_OUTPUT
-            echo "failed=validate" >> $GITHUB_OUTPUT
-            echo "error<<EOF" >> $GITHUB_OUTPUT
-            echo "${{ steps.validate.outputs.stderr }}"
-            echo "EOF" >> $GITHUB_OUTPUT
-          else
-            echo "valid=true" >> $GITHUB_OUTPUT
-          fi
-
       - name: Create validation comment
-        if: steps.extract-terraform.outputs.has_terraform == 'true' && steps.terraform.outputs.valid != 'true'
+        if: steps.extract-terraform.outputs.has_terraform == 'true' && (steps.init.outputs.exitcode != '0' || steps.validate.outputs.exitcode != '0')
         uses: mshick/add-pr-comment@v2
         with:
           issue: ${{ github.event.issue.number }}
@@ -103,16 +83,20 @@ jobs:
             terraform init
             terraform validate
             ```
-
-            **Terraform ${{ steps.terraform.outputs.failed }} failed:**
+            ${{ steps.init.outputs.exitcode != '0' && format('
+            **Terraform init failed:**
             ```
-            ${{ steps.terraform.outputs.error }}
+            %s
+            ```', steps.init.outputs.stderr) || '' }}${{ steps.validate.outputs.exitcode != '0' && format('
+            **Terraform validate failed:**
             ```
+            %s
+            ```', steps.validate.outputs.stderr) || '' }}
 
             <sub>In the rare case that an invalid module or multiple files is part of the issue, you can indicate that this is expected with a :+1: on this comment</sub>
 
       - name: Hide validation comment if valid
-        if: steps.extract-terraform.outputs.has_terraform == 'true' && steps.terraform.outputs.valid == 'true'
+        if: steps.extract-terraform.outputs.has_terraform == 'true' && steps.init.outputs.exitcode == '0' && steps.validate.outputs.exitcode == '0'
         uses: mshick/add-pr-comment@v2
         with:
           issue: ${{ github.event.issue.number }}
