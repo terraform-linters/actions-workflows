@@ -58,7 +58,8 @@ jobs:
           EOF
 
           # Initialize
-          if ! terraform init 2>&1 | tee init.log; then
+          terraform init 2>&1 | tee init.log
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
             echo "valid=false" >> $GITHUB_OUTPUT
             echo "failed=init" >> $GITHUB_OUTPUT
             echo "error<<EOF" >> $GITHUB_OUTPUT
@@ -68,7 +69,8 @@ jobs:
           fi
 
           # Validate
-          if ! terraform validate 2>&1 | tee validate.log; then
+          terraform validate 2>&1 | tee validate.log
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
             echo "valid=false" >> $GITHUB_OUTPUT
             echo "failed=validate" >> $GITHUB_OUTPUT
             echo "error<<EOF" >> $GITHUB_OUTPUT
