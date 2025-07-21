@@ -84,7 +84,7 @@ jobs:
         if: steps.extract-terraform.outputs.has_terraform == 'true'
         uses: mshick/add-pr-comment@v2
         with:
-          issue-number: ${{ github.event.issue.number }}
+          issue: ${{ github.event.issue.number }}
           message-id: terraform-validation
           refresh-message-position: true
           message: |
