@@ -81,14 +81,14 @@ jobs:
           echo "valid=true" >> $GITHUB_OUTPUT
 
       - name: Create validation comment
-        if: steps.extract-terraform.outputs.has_terraform == 'true'
+        if: steps.extract-terraform.outputs.has_terraform == 'true' && steps.terraform.outputs.valid != 'true'
         uses: mshick/add-pr-comment@v2
         with:
           issue: ${{ github.event.issue.number }}
           message-id: terraform-validation
           refresh-message-position: true
           message: |
-            ${{ steps.terraform.outputs.valid == 'true' && '✅ **Terraform configuration is valid!**' || '⚠️ The provided Terraform configuration is **not valid**. Please ensure that your Terraform configuration and issue is directly reproducible. We are unable to review issues with partial reproductions, including omitted configuration or references to other files.
+            ⚠️ The provided Terraform configuration is **not valid**. Please ensure that your Terraform configuration and issue is directly reproducible. We are unable to review issues with partial reproductions, including omitted configuration or references to other files.
 
             ```sh
             terraform init
@@ -100,4 +100,13 @@ jobs:
             ${{ steps.terraform.outputs.error }}
             ```
 
-            <small>In the rare case that an invalid module or multiple files is part of the issue, you can indicate that this is expected with a :+1: on this comment</small>' }}
+            <small>In the rare case that an invalid module or multiple files is part of the issue, you can indicate that this is expected with a :+1: on this comment</small>
+
+      - name: Hide validation comment if valid
+        if: steps.extract-terraform.outputs.has_terraform == 'true' && steps.terraform.outputs.valid == 'true'
+        uses: mshick/add-pr-comment@v2
+        with:
+          issue: ${{ github.event.issue.number }}
+          message-id: terraform-validation
+          message: |
+            <!-- Hidden: Terraform configuration is now valid -->
