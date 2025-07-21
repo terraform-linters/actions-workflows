@@ -46,41 +46,46 @@ jobs:
         with:
           terraform_version: latest
 
-      - name: Validate Terraform configuration
+      - name: Create Terraform file
         if: steps.extract-terraform.outputs.has_terraform == 'true'
-        id: terraform
         run: |
-          # Create temporary directory and file
           mkdir -p /tmp/terraform-validation
           cd /tmp/terraform-validation
           cat > main.tf << 'EOF'
           ${{ steps.extract-terraform.outputs.terraform_code }}
           EOF
 
-          # Initialize
-          terraform init 2>&1 | tee init.log
-          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+      - name: Terraform Init
+        if: steps.extract-terraform.outputs.has_terraform == 'true'
+        id: init
+        working-directory: /tmp/terraform-validation
+        run: terraform init -no-color
+
+      - name: Terraform Validate
+        if: steps.extract-terraform.outputs.has_terraform == 'true' && steps.init.outputs.exitcode == '0'
+        id: validate
+        working-directory: /tmp/terraform-validation
+        run: terraform validate -no-color
+
+      - name: Set validation outputs
+        if: steps.extract-terraform.outputs.has_terraform == 'true'
+        id: terraform
+        run: |
+          if [[ "${{ steps.init.outputs.exitcode }}" != "0" ]]; then
             echo "valid=false" >> $GITHUB_OUTPUT
             echo "failed=init" >> $GITHUB_OUTPUT
             echo "error<<EOF" >> $GITHUB_OUTPUT
-            cat init.log
+            echo "${{ steps.init.outputs.stderr }}"
             echo "EOF" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          # Validate
-          terraform validate 2>&1 | tee validate.log
-          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+          elif [[ "${{ steps.validate.outputs.exitcode }}" != "0" ]]; then
             echo "valid=false" >> $GITHUB_OUTPUT
             echo "failed=validate" >> $GITHUB_OUTPUT
             echo "error<<EOF" >> $GITHUB_OUTPUT
-            cat validate.log
+            echo "${{ steps.validate.outputs.stderr }}"
             echo "EOF" >> $GITHUB_OUTPUT
-            exit 0
+          else
+            echo "valid=true" >> $GITHUB_OUTPUT
           fi
-
-          # Both succeeded
-          echo "valid=true" >> $GITHUB_OUTPUT
 
       - name: Create validation comment
         if: steps.extract-terraform.outputs.has_terraform == 'true' && steps.terraform.outputs.valid != 'true'
