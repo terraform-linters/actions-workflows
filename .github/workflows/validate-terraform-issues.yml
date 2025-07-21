@@ -86,11 +86,11 @@ jobs:
             ${{ steps.init.outputs.exitcode != '0' && format('
             **Terraform init failed:**
             ```
-            %s
+            {0}
             ```', steps.init.outputs.stderr) || '' }}${{ steps.validate.outputs.exitcode != '0' && format('
             **Terraform validate failed:**
             ```
-            %s
+            {0}
             ```', steps.validate.outputs.stderr) || '' }}
 
             <sub>In the rare case that an invalid module or multiple files is part of the issue, you can indicate that this is expected with a :+1: on this comment</sub>
