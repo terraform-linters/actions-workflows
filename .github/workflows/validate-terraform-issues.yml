@@ -1,0 +1,102 @@
+name: Validate Terraform in Issue
+
+on:
+  workflow_call:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  issues: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract Terraform code from issue
+        id: extract-terraform
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: issue } = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+
+            const terraformRegex = /```terraform\s*\n([\s\S]*?)```/g;
+            const matches = [];
+            let match;
+
+            while ((match = terraformRegex.exec(issue.body || '')) !== null) {
+              matches.push(match[1].trim());
+            }
+
+            if (matches.length === 0) {
+              core.setOutput('has_terraform', 'false');
+              return;
+            }
+
+            const terraformCode = matches.join('\n\n');
+            core.setOutput('has_terraform', 'true');
+            core.setOutput('terraform_code', terraformCode);
+
+      - name: Setup Terraform
+        if: steps.extract-terraform.outputs.has_terraform == 'true'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: latest
+
+      - name: Validate Terraform configuration
+        if: steps.extract-terraform.outputs.has_terraform == 'true'
+        id: terraform
+        run: |
+          # Create temporary directory and file
+          mkdir -p /tmp/terraform-validation
+          cd /tmp/terraform-validation
+          cat > main.tf << 'EOF'
+          ${{ steps.extract-terraform.outputs.terraform_code }}
+          EOF
+
+          # Initialize
+          if ! terraform init 2>&1 | tee init.log; then
+            echo "valid=false" >> $GITHUB_OUTPUT
+            echo "failed=init" >> $GITHUB_OUTPUT
+            echo "error<<EOF" >> $GITHUB_OUTPUT
+            cat init.log
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Validate
+          if ! terraform validate 2>&1 | tee validate.log; then
+            echo "valid=false" >> $GITHUB_OUTPUT
+            echo "failed=validate" >> $GITHUB_OUTPUT
+            echo "error<<EOF" >> $GITHUB_OUTPUT
+            cat validate.log
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Both succeeded
+          echo "valid=true" >> $GITHUB_OUTPUT
+
+      - name: Create validation comment
+        if: steps.extract-terraform.outputs.has_terraform == 'true'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          number: ${{ github.event.issue.number }}
+          hide: ${{ steps.terraform.outputs.valid == 'true' }}
+          message: |
+            ⚠️ The provided Terraform configuration is **not valid**. Please ensure that your Terraform configuration and issue is directly reproducible. We are unable to review issues with partial reproductions, including omitted configuration or references to other files.
+
+            ```sh
+            terraform init
+            terraform validate
+            ```
+
+            **Terraform ${{ steps.terraform.outputs.failed }} failed:**
+            ```
+            ${{ steps.terraform.outputs.error }}
+            ```
+
+            <small>In the rare case that an invalid module or multiple files is part of the issue, you can indicate that this is expected with a :+1: on this comment</small>
