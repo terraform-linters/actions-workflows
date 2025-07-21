@@ -95,15 +95,49 @@ jobs:
 
             <sub>In the rare case that an invalid module or multiple files is part of the issue, you can indicate that this is expected with a :+1: on this comment</sub>
 
-      - name: Hide validation comment if valid
+      - name: Update and minimize comment if valid
         if: steps.extract-terraform.outputs.has_terraform == 'true' && steps.init.outputs.exitcode == '0' && steps.validate.outputs.exitcode == '0'
-        uses: mshick/add-pr-comment@v2
+        uses: actions/github-script@v7
         with:
-          issue: ${{ github.event.issue.number }}
-          message-id: terraform-validation
-          message: |
-            <!-- This comment is hidden because the Terraform configuration is now valid -->
+          script: |
+            // Find the existing comment
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
             
+            const botComment = comments.data.find(comment => 
+              comment.user.login === 'github-actions[bot]' && 
+              comment.body.includes('terraform-validation')
+            );
+            
+            if (botComment) {
+              // Update the comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: `<!-- add-pr-comment:terraform-validation -->
+
             ~~⚠️ The provided Terraform configuration is **not valid**. Please ensure that your Terraform configuration and issue is directly reproducible. We are unable to review issues with partial reproductions, including omitted configuration or references to other files.~~
-            
-            ✅ **Terraform configuration is now valid!**
+
+            ✅ **Terraform configuration is now valid!**`
+              });
+              
+              // Minimize the comment
+              await github.graphql(`
+                mutation($commentId: ID!) {
+                  minimizeComment(input: {
+                    subjectId: $commentId
+                    classifier: RESOLVED
+                  }) {
+                    minimizedComment {
+                      isMinimized
+                    }
+                  }
+                }
+              `, {
+                commentId: botComment.node_id
+              });
+            }
