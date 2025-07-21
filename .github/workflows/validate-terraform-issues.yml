@@ -102,4 +102,8 @@ jobs:
           issue: ${{ github.event.issue.number }}
           message-id: terraform-validation
           message: |
-            <!-- Hidden: Terraform configuration is now valid -->
+            <!-- This comment is hidden because the Terraform configuration is now valid -->
+            
+            ~~⚠️ The provided Terraform configuration is **not valid**. Please ensure that your Terraform configuration and issue is directly reproducible. We are unable to review issues with partial reproductions, including omitted configuration or references to other files.~~
+            
+            ✅ **Terraform configuration is now valid!** Thank you for providing a complete, reproducible configuration.
