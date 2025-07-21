@@ -60,12 +60,14 @@ jobs:
         id: init
         working-directory: /tmp/terraform-validation
         run: terraform init -no-color
+        continue-on-error: true
 
       - name: Terraform Validate
         if: steps.extract-terraform.outputs.has_terraform == 'true' && steps.init.outputs.exitcode == '0'
         id: validate
         working-directory: /tmp/terraform-validation
         run: terraform validate -no-color
+        continue-on-error: true
 
       - name: Set validation outputs
         if: steps.extract-terraform.outputs.has_terraform == 'true'
